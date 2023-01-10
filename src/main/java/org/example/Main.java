@@ -1,20 +1,22 @@
 package org.example;
 
 import java.util.*;
+import java.util.concurrent.*;
 
 public class Main {
 
-    public static void main(String[] args) throws InterruptedException {
+    public static void main(String[] args) {
         String[] texts = new String[25];
         for (int i = 0; i < texts.length; i++) {
             texts[i] = generateText("aab", 30_000);
         }
 
-        List<Thread> threads = new ArrayList<>();
+        List<Future<Integer>> threads = new ArrayList<>();
+        ExecutorService threadPool = Executors.newFixedThreadPool(texts.length);
 
         long startTs = System.currentTimeMillis(); // start time
         for (String text : texts) {
-            Runnable runnable = () -> {
+            Callable<Integer> runnable = () -> {
                 int maxSize = 0;
                 for (int i = 0; i < text.length(); i++) {
                     for (int j = 0; j < text.length(); j++) {
@@ -34,15 +36,24 @@ public class Main {
                     }
                 }
                 System.out.println(text.substring(0, 100) + " -> " + maxSize);
+                return maxSize;
             };
-            Thread thread = new Thread(runnable);
-            thread.start();
-            threads.add(thread);
+            threads.add(threadPool.submit(runnable));
         }
 
-        for (Thread thread : threads) {
-            thread.join();
-        }
+        threadPool.shutdown();
+
+        List<Integer> list = new ArrayList<>();
+
+        threads.forEach(n -> {
+            try {
+                list.add(n.get());
+            } catch (InterruptedException | ExecutionException e) {
+                throw new RuntimeException(e);
+            }
+        });
+
+        System.out.println(Collections.max(list));
 
         long endTs = System.currentTimeMillis(); // end time
 
